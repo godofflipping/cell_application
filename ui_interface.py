@@ -3,11 +3,16 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu, 
     QMenuBar, QSizePolicy, QStatusBar, QVBoxLayout, QWidget)
 
-from ImageViewer import ImageViewer
+from image_viewer import ImageViewer
+from watershed import watershed_algo
 
 class Ui_MainWindow(object):
     
     def setupUi(self, MainWindow, images):
+        
+        self.cells = dict()
+        self.current_cells = []
+        self.current_img = ""
         
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
@@ -35,7 +40,6 @@ class Ui_MainWindow(object):
         self.img_list = QListWidget(self.centralwidget)
         self.img_list.setObjectName(u"img_list")
         self.img_list.addItems(images)
-        self.img_list.itemClicked.connect(self.changeImage)
         
         sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
@@ -49,7 +53,14 @@ class Ui_MainWindow(object):
         self.cell_list = QListWidget(self.centralwidget)
         self.cell_list.setObjectName(u"cell_list")
         self.getCells(images)
+        
+        self.img_list.itemClicked.connect(self.getCellList)
+        self.img_list.itemClicked.connect(self.changeImage)
+        self.img_list.itemClicked.connect(self.getFullInfo)
+        
         self.cell_list.itemClicked.connect(self.changeCell)
+        self.cell_list.itemClicked.connect(self.getProba)
+        self.cell_list.itemClicked.connect(self.getComment)
         
         sizePolicy1.setHeightForWidth(self.cell_list.sizePolicy().hasHeightForWidth())
         
@@ -158,21 +169,31 @@ class Ui_MainWindow(object):
         self.menuHelp.setTitle(QCoreApplication.translate("MainWindow", u"Help", None))
     
     def changeImage(self, item):
+        self.current_img = item.text()
         self.whole_img.setPhoto(QPixmap(u"images/" + item.text()))
     
     def changeCell(self, item):
-        self.cell_img.setPhoto(QPixmap(u"images/" + item.text()))
+        number = int(''.join(x for x in item.text() if x.isdigit())) - 1
+        x1, y1, x2, y2 = self.current_cells[number] 
+        self.cell_img.setPhoto(QPixmap(u"images/" + self.current_img).copy(y1, x1, y2-y1, x2-x1))
     
     def getCells(self, images):
-        cells = images
+        for i in range(len(images)):
+            image_path = "images/" + images[i]
+            self.cells[images[i]], _ = watershed_algo(image_path)
         self.cell_list.clear()
-        self.cell_list.addItems(cells)
         
-    def getFullInfo(self, text):
-        pass
+    def getCellList(self, item):
+        self.cell_list.clear()
+        self.current_cells = self.cells[item.text()]
+        cell_names = ["Cell " + str(i) for i in range(1, len(self.current_cells) + 1)]
+        self.cell_list.addItems(cell_names)
+        
+    def getFullInfo(self, item):
+        self.full_info.setText(u"You have chosen " + item.text())
     
-    def getProba(self, text):
-        pass
+    def getProba(self, item):
+        self.proba_comm.setText(u"Probability of " + item.text())
         
-    def getComment(self, text):
-        pass
+    def getComment(self, item):
+        self.edit_comm.setText(u"Edit comment to " + item.text())

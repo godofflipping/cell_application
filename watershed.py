@@ -3,7 +3,11 @@ import numpy as np
 from skimage import measure
 from skimage.segmentation import clear_border
 
+
 def watershedAlgo(image_path):
+    
+    area = 1e6
+    alpha = 0.275
     
     image = cv2.imread(image_path)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -18,7 +22,7 @@ def watershedAlgo(image_path):
     sure_bg = cv2.dilate(opening, kernel, iterations=10)
 
     dist_transform = cv2.distanceTransform(opening, cv2.DIST_L2, 5)
-    _, sure_fg = cv2.threshold(dist_transform, 0.3 * dist_transform.max(), 255, 0)
+    _, sure_fg = cv2.threshold(dist_transform, alpha * dist_transform.max(), 255, 0)
 
     sure_fg = np.uint8(sure_fg)
     unknown = cv2.subtract(sure_bg, sure_fg)
@@ -33,17 +37,21 @@ def watershedAlgo(image_path):
     result = []
     
     for i in range(len(regions)):
-        result.append(regions[i]['bbox'])
+        x1, y1, x2, y2 = regions[i]['bbox']
+        if (x2 - x1) * (y2 - y1) < area:
+            result.append(regions[i]['bbox'])
         
     return result, image
+
 
 def dummyAlgo(image_path):
     image = cv2.imread(image_path)
     return [], image
 
+
 if __name__ == '__main__':
     
-    image_path = 'images/1.jpg'
+    image_path = 'images/2.jpg'
     boundaries, image = watershedAlgo(image_path)
     
     for i in range(len(boundaries)):

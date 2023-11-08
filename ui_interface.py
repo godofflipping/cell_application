@@ -1,3 +1,5 @@
+import os
+
 from PySide6.QtCore import QCoreApplication, QMetaObject, QRect
 from PySide6.QtGui import QPixmap, QAction
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu,
@@ -6,7 +8,6 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu,
 from image_viewer import ImageViewer
 from watershed import watershedAlgo, dummyAlgo
 
-import os
 
 class Ui_MainWindow(object):
     
@@ -54,7 +55,7 @@ class Ui_MainWindow(object):
         self.load_images = QAction(MainWindow)
         self.load_images.setObjectName(u"load_images")
         self.load_images.triggered.connect(self.getImages)
-        self.load_images.setCheckable(True)
+        self.load_images.setCheckable(False)
         self.menuFile.addAction(self.load_images)
         
         self.watershed_option = QAction(MainWindow)
@@ -176,6 +177,7 @@ class Ui_MainWindow(object):
 
         QMetaObject.connectSlotsByName(MainWindow)
 
+    
     def retranslateUi(self, MainWindow):
         
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Test", None))
@@ -192,21 +194,26 @@ class Ui_MainWindow(object):
         self.watershed_option.setText(QCoreApplication.translate("MainWindow", u"watershed", None))
         self.load_images.setText(QCoreApplication.translate("MainWindow", u"Load Images", None))
     
+    
     def getImages(self, item):
-        if item:
+        if not item:
             images = QFileDialog.getExistingDirectory(None, 'Select a folder:', 'C:\\', QFileDialog.ShowDirsOnly)
             self.images = os.listdir(images + '/')
+            self.img_list.clear()
             self.img_list.addItems(self.images)
-        print(item)
     
+        
     def changeImage(self, item):
         self.current_img = item.text()
         self.whole_img.setPhoto(QPixmap(u"images/" + item.text()))
     
+        
     def changeCell(self, item):
         number = int(''.join(x for x in item.text() if x.isdigit())) - 1
         x1, y1, x2, y2 = self.current_cells[number] 
         self.cell_img.setPhoto(QPixmap(u"images/" + self.current_img).copy(y1, x1, y2-y1, x2-x1))
+        self.whole_img.addBoundaries(y1, x1, y2, x2)
+        
     
     def getCells(self, images):
         for i in range(len(images)):
@@ -214,6 +221,7 @@ class Ui_MainWindow(object):
             self.cells[images[i]], _ = self.algorithm(image_path)
         self.cell_list.clear()
         
+    
     def getCellList(self, item):
         self.cell_list.clear()
         if item.text() in self.cells.keys():
@@ -221,10 +229,12 @@ class Ui_MainWindow(object):
             cell_names = ["Cell " + str(i) for i in range(1, len(self.current_cells) + 1)]
             self.cell_list.addItems(cell_names)
         
+    
     def setWatershedAlgo(self, item):
         if item:
             self.algorithm = self.algorithms['watershed']
             self.getCells(self.images)
+    
     
     def getFullInfo(self, item):
         self.full_info.setText(u"You have chosen " + item.text())

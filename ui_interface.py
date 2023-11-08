@@ -1,25 +1,68 @@
 from PySide6.QtCore import QCoreApplication, QMetaObject, QRect
 from PySide6.QtGui import QPixmap, QAction
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu, 
-    QMenuBar, QSizePolicy, QStatusBar, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu,
+    QMenuBar, QSizePolicy, QStatusBar, QVBoxLayout, QWidget, QFileDialog)
 
 from image_viewer import ImageViewer
 from watershed import watershedAlgo, dummyAlgo
 
+import os
+
 class Ui_MainWindow(object):
     
-    def setupUi(self, MainWindow, images):
+    def setupUi(self, MainWindow):
         
         self.cells = dict()
         self.current_cells = []
         self.current_img = ""
         self.algorithm = dummyAlgo
         self.algorithms = dict()
-        self.images = images
+        self.images = []
         
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(1080, 720)
+        
+        self.menubar = QMenuBar(MainWindow)
+        self.menubar.setObjectName(u"menubar")
+        self.menubar.setGeometry(QRect(0, 0, 957, 22))
+        
+        self.menuFile = QMenu(self.menubar)
+        self.menuFile.setObjectName(u"menu_file")
+        
+        self.menuEdit = QMenu(self.menubar)
+        self.menuEdit.setObjectName(u"menu_edit")
+        
+        self.menuHelp = QMenu(self.menubar)
+        self.menuHelp.setObjectName(u"menu_help")
+        
+        self.menuAlgo = QMenu(self.menubar)
+        self.menuHelp.setObjectName(u"menu_algo")
+        
+        MainWindow.setMenuBar(self.menubar)
+        
+        self.statusbar = QStatusBar(MainWindow)
+        self.statusbar.setObjectName(u"status_bar")
+        
+        MainWindow.setStatusBar(self.statusbar)
+
+        self.menubar.addAction(self.menuFile.menuAction())
+        self.menubar.addAction(self.menuEdit.menuAction())
+        self.menubar.addAction(self.menuHelp.menuAction())
+        self.menubar.addAction(self.menuAlgo.menuAction())
+        
+        self.load_images = QAction(MainWindow)
+        self.load_images.setObjectName(u"load_images")
+        self.load_images.triggered.connect(self.getImages)
+        self.load_images.setCheckable(True)
+        self.menuFile.addAction(self.load_images)
+        
+        self.watershed_option = QAction(MainWindow)
+        self.watershed_option.setObjectName(u"watershed")
+        self.algorithms[self.watershed_option.objectName()] = watershedAlgo
+        self.watershed_option.triggered.connect(self.setWatershedAlgo)
+        self.watershed_option.setCheckable(True)
+        self.menuAlgo.addAction(self.watershed_option)
         
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -42,7 +85,6 @@ class Ui_MainWindow(object):
         
         self.img_list = QListWidget(self.centralwidget)
         self.img_list.setObjectName(u"img_list")
-        self.img_list.addItems(images)
         
         sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
@@ -130,41 +172,6 @@ class Ui_MainWindow(object):
 
         MainWindow.setCentralWidget(self.centralwidget)
         
-        self.menubar = QMenuBar(MainWindow)
-        self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 957, 22))
-        
-        self.menuFile = QMenu(self.menubar)
-        self.menuFile.setObjectName(u"menu_file")
-        
-        self.menuEdit = QMenu(self.menubar)
-        self.menuEdit.setObjectName(u"menu_edit")
-        
-        self.menuHelp = QMenu(self.menubar)
-        self.menuHelp.setObjectName(u"menu_help")
-        
-        self.menuAlgo = QMenu(self.menubar)
-        self.menuHelp.setObjectName(u"menu_algo")
-        
-        MainWindow.setMenuBar(self.menubar)
-        
-        self.statusbar = QStatusBar(MainWindow)
-        self.statusbar.setObjectName(u"status_bar")
-        
-        MainWindow.setStatusBar(self.statusbar)
-
-        self.menubar.addAction(self.menuFile.menuAction())
-        self.menubar.addAction(self.menuEdit.menuAction())
-        self.menubar.addAction(self.menuHelp.menuAction())
-        self.menubar.addAction(self.menuAlgo.menuAction())
-        
-        self.watershed_option = QAction(MainWindow)
-        self.watershed_option.setObjectName(u"watershed")
-        self.algorithms[self.watershed_option.objectName()] = watershedAlgo
-        self.watershed_option.triggered.connect(self.setWatershedAlgo)
-        self.watershed_option.setCheckable(True)
-        self.menuAlgo.addAction(self.watershed_option)
-
         self.retranslateUi(MainWindow)
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -183,6 +190,14 @@ class Ui_MainWindow(object):
         self.menuAlgo.setTitle(QCoreApplication.translate("MainWindow", u"Algo", None))
         
         self.watershed_option.setText(QCoreApplication.translate("MainWindow", u"watershed", None))
+        self.load_images.setText(QCoreApplication.translate("MainWindow", u"Load Images", None))
+    
+    def getImages(self, item):
+        if item:
+            images = QFileDialog.getExistingDirectory(None, 'Select a folder:', 'C:\\', QFileDialog.ShowDirsOnly)
+            self.images = os.listdir(images + '/')
+            self.img_list.addItems(self.images)
+        print(item)
     
     def changeImage(self, item):
         self.current_img = item.text()

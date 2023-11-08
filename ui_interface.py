@@ -1,10 +1,10 @@
 from PySide6.QtCore import QCoreApplication, QMetaObject, QRect
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QAction
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu, 
     QMenuBar, QSizePolicy, QStatusBar, QVBoxLayout, QWidget)
 
 from image_viewer import ImageViewer
-from watershed import watershed_algo
+from watershed import watershedAlgo, dummyAlgo
 
 class Ui_MainWindow(object):
     
@@ -13,6 +13,9 @@ class Ui_MainWindow(object):
         self.cells = dict()
         self.current_cells = []
         self.current_img = ""
+        self.algorithm = dummyAlgo
+        self.algorithms = dict()
+        self.images = images
         
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
@@ -52,7 +55,6 @@ class Ui_MainWindow(object):
 
         self.cell_list = QListWidget(self.centralwidget)
         self.cell_list.setObjectName(u"cell_list")
-        self.getCells(images)
         
         self.img_list.itemClicked.connect(self.getCellList)
         self.img_list.itemClicked.connect(self.changeImage)
@@ -141,16 +143,27 @@ class Ui_MainWindow(object):
         self.menuHelp = QMenu(self.menubar)
         self.menuHelp.setObjectName(u"menu_help")
         
+        self.menuAlgo = QMenu(self.menubar)
+        self.menuHelp.setObjectName(u"menu_algo")
+        
         MainWindow.setMenuBar(self.menubar)
         
         self.statusbar = QStatusBar(MainWindow)
-        self.statusbar.setObjectName(u"statusbar")
+        self.statusbar.setObjectName(u"status_bar")
         
         MainWindow.setStatusBar(self.statusbar)
 
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
+        self.menubar.addAction(self.menuAlgo.menuAction())
+        
+        self.watershed_option = QAction(MainWindow)
+        self.watershed_option.setObjectName(u"watershed")
+        self.algorithms[self.watershed_option.objectName()] = watershedAlgo
+        self.watershed_option.triggered.connect(self.setWatershedAlgo)
+        self.watershed_option.setCheckable(True)
+        self.menuAlgo.addAction(self.watershed_option)
 
         self.retranslateUi(MainWindow)
 
@@ -167,6 +180,9 @@ class Ui_MainWindow(object):
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.menuEdit.setTitle(QCoreApplication.translate("MainWindow", u"Edit", None))
         self.menuHelp.setTitle(QCoreApplication.translate("MainWindow", u"Help", None))
+        self.menuAlgo.setTitle(QCoreApplication.translate("MainWindow", u"Algo", None))
+        
+        self.watershed_option.setText(QCoreApplication.translate("MainWindow", u"watershed", None))
     
     def changeImage(self, item):
         self.current_img = item.text()
@@ -180,15 +196,21 @@ class Ui_MainWindow(object):
     def getCells(self, images):
         for i in range(len(images)):
             image_path = "images/" + images[i]
-            self.cells[images[i]], _ = watershed_algo(image_path)
+            self.cells[images[i]], _ = self.algorithm(image_path)
         self.cell_list.clear()
         
     def getCellList(self, item):
         self.cell_list.clear()
-        self.current_cells = self.cells[item.text()]
-        cell_names = ["Cell " + str(i) for i in range(1, len(self.current_cells) + 1)]
-        self.cell_list.addItems(cell_names)
+        if item.text() in self.cells.keys():
+            self.current_cells = self.cells[item.text()]
+            cell_names = ["Cell " + str(i) for i in range(1, len(self.current_cells) + 1)]
+            self.cell_list.addItems(cell_names)
         
+    def setWatershedAlgo(self, item):
+        if item:
+            self.algorithm = self.algorithms['watershed']
+            self.getCells(self.images)
+    
     def getFullInfo(self, item):
         self.full_info.setText(u"You have chosen " + item.text())
     

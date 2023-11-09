@@ -216,6 +216,7 @@ class Ui_MainWindow(object):
         
     def changeImage(self, item):
         self.current_img = item.text()
+        self.is_segmented = False
         self.whole_img.removeBoundaries()
         self.whole_img.setPhoto(QPixmap(self.path_to_dir + item.text()))
     

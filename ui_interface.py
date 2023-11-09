@@ -1,7 +1,7 @@
 import os
 
 from PySide6.QtCore import QCoreApplication, QMetaObject, QRect
-from PySide6.QtGui import QPixmap, QAction
+from PySide6.QtGui import QPixmap, QAction, QImage
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu,
     QMenuBar, QSizePolicy, QStatusBar, QVBoxLayout, QWidget, QFileDialog)
 
@@ -19,6 +19,10 @@ class Ui_MainWindow(object):
         self.algorithm = dummyAlgo
         self.algorithms = dict()
         self.images = []
+        self.segment_images = dict()
+        self.path_to_dir = ""
+        self.is_segmented = False
+        
         
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
@@ -57,6 +61,12 @@ class Ui_MainWindow(object):
         self.load_images.triggered.connect(self.getImages)
         self.load_images.setCheckable(False)
         self.menuFile.addAction(self.load_images)
+        
+        self.segmentation = QAction(MainWindow)
+        self.segmentation.setObjectName(u"segmentation")
+        self.segmentation.triggered.connect(self.changeMode)
+        self.segmentation.setCheckable(False)
+        self.menuEdit.addAction(self.segmentation)
         
         self.watershed_option = QAction(MainWindow)
         self.watershed_option.setObjectName(u"watershed")
@@ -193,32 +203,37 @@ class Ui_MainWindow(object):
         
         self.watershed_option.setText(QCoreApplication.translate("MainWindow", u"watershed", None))
         self.load_images.setText(QCoreApplication.translate("MainWindow", u"Load Images", None))
+        self.segmentation.setText(QCoreApplication.translate("MainWindow", u"Segmentation", None))
     
     
     def getImages(self, item):
         if not item:
-            images = QFileDialog.getExistingDirectory(None, 'Select a folder:', 'C:\\', QFileDialog.ShowDirsOnly)
-            self.images = os.listdir(images + '/')
+            self.path_to_dir = QFileDialog.getExistingDirectory(None, 'Select a folder:', 'C:\\', QFileDialog.ShowDirsOnly)  + '/'
+            self.images = os.listdir(self.path_to_dir)
             self.img_list.clear()
             self.img_list.addItems(self.images)
     
         
     def changeImage(self, item):
         self.current_img = item.text()
-        self.whole_img.setPhoto(QPixmap(u"images/" + item.text()))
+        self.whole_img.removeBoundaries()
+        self.whole_img.setPhoto(QPixmap(self.path_to_dir + item.text()))
     
         
     def changeCell(self, item):
         number = int(''.join(x for x in item.text() if x.isdigit())) - 1
-        x1, y1, x2, y2 = self.current_cells[number] 
-        self.cell_img.setPhoto(QPixmap(u"images/" + self.current_img).copy(y1, x1, y2-y1, x2-x1))
+        x1, y1, x2, y2 = self.current_cells[number]
+        self.cell_img.setPhoto(QPixmap(self.path_to_dir + self.current_img).copy(y1, x1, y2-y1, x2-x1))
         self.whole_img.addBoundaries(y1, x1, y2, x2)
         
     
     def getCells(self, images):
         for i in range(len(images)):
-            image_path = "images/" + images[i]
-            self.cells[images[i]], _ = self.algorithm(image_path)
+            image_path = self.path_to_dir + images[i]
+            self.cells[images[i]], image = self.algorithm(image_path)
+            image = QImage(image, image.shape[1],\
+                            image.shape[0], image.shape[1] * 3,QImage.Format_BGR888)
+            self.segment_images[images[i]] = QPixmap(image)
         self.cell_list.clear()
         
     
@@ -235,6 +250,15 @@ class Ui_MainWindow(object):
             self.algorithm = self.algorithms['watershed']
             self.getCells(self.images)
     
+            
+    def changeMode(self, item):
+        if not item:
+            self.is_segmented = not self.is_segmented
+        if self.is_segmented:
+            self.whole_img.setPhoto(self.segment_images[self.current_img])
+        else:
+            self.whole_img.setPhoto(QPixmap(self.path_to_dir + self.current_img))
+            
     
     def getFullInfo(self, item):
         self.full_info.setText(u"You have chosen " + item.text())

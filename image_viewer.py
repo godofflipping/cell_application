@@ -17,11 +17,10 @@ class ImageViewer(QGraphicsView):
         
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
-        self.pen = QPen(Qt.yellow)
+        self.pen = QPen(Qt.green)
         
         self.rect = QGraphicsRectItem()
-        self.rect.setRect(0, 0, 0, 0)
-        self.scene.addItem(self.rect)
+        self.addRectToScene(0, 0, 0, 0)
         
         self.photo = QGraphicsPixmapItem()
         self.scene.addItem(self.photo)
@@ -121,9 +120,18 @@ class ImageViewer(QGraphicsView):
         
         super(ImageViewer, self).mousePressEvent(event)
         
+    
+    def addRectToScene(self, x1, y1, x2, y2):
+        self.rect.setRect(x1, y1, x2-x1, y2-y1)
+        self.scene.addItem(self.rect)
         
+    
     def addBoundaries(self, x1, y1, x2, y2):
         self.scene.removeItem(self.rect)
         self.rect.setPen(self.pen)
-        self.rect.setRect(x1, y1, x2-x1, y2-y1)
-        self.scene.addItem(self.rect)
+        self.addRectToScene(x1, y1, x2, y2)
+        
+    
+    def removeBoundaries(self):
+        self.scene.removeItem(self.rect)
+        self.addRectToScene(0, 0, 0, 0)

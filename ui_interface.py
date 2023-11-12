@@ -24,6 +24,8 @@ class Ui_MainWindow(object):
         self.is_segmented = False
         self.cell_img_width = 0
         self.cell_img_height = 0
+        self.image_width = 1280
+        self.image_height = 960
         
         
         if not MainWindow.objectName():
@@ -225,27 +227,23 @@ class Ui_MainWindow(object):
     
     def cellImageCoords(self, x1, y1, x2, y2):
         
-        x_center = (x1 + x2) // 2
-        y_center = (y1 + y2) // 2 
-        x_tl = x1
-        y_tl = y1
         self.cell_img_width = 200
         self.cell_img_height = 200
         
-        x_tl = x_center - 100
-        y_tl = y_center - 100
+        x_tl = (x1 + x2) // 2 - 100
+        y_tl = (y1 + y2) // 2  - 100
         
         if x_tl <= 0:
-            x_tl = 1
+            x_tl = 0
         
         if y_tl <= 0:
-            y_tl = 1
+            y_tl = 0
             
-        if x_tl>= 1279:
-            x_tl = 1079
+        if y_tl > self.image_width - self.cell_img_width:
+            y_tl = self.image_width - self.cell_img_width
             
-        if y_tl >= 959:
-            y_tl = 759
+        if x_tl > self.image_height - self.cell_img_height:
+            x_tl = self.image_height - self.cell_img_height
                 
         return y_tl, x_tl, self.cell_img_width, self.cell_img_height
     
@@ -293,9 +291,11 @@ class Ui_MainWindow(object):
     
     def getFullInfo(self, item):
         self.full_info.setText(u"You have chosen " + item.text())
+        
     
     def getProba(self, item):
         self.proba_comm.setText(u"Probability of " + item.text())
+        
         
     def getComment(self, item):
         self.edit_comm.setText(u"Edit comment to " + item.text())

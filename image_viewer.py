@@ -126,10 +126,10 @@ class ImageViewer(QGraphicsView):
         self.scene.addItem(self.rect)
         
     
-    def addBoundaries(self, x1, y1, x2, y2):
+    def addBoundaries(self, x, y, width, height):
         self.scene.removeItem(self.rect)
         self.rect.setPen(self.pen)
-        self.addRectToScene(x1, y1, x2, y2)
+        self.addRectToScene(x, y, x + width, y + height)
         
     
     def removeBoundaries(self):

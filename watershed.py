@@ -7,7 +7,7 @@ from skimage.segmentation import clear_border
 def watershedAlgo(image_path):
     
     area = 1e6
-    alpha = 0.275
+    alpha = 0.2
     
     image = cv2.imread(image_path)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

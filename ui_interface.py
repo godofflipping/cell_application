@@ -22,6 +22,8 @@ class Ui_MainWindow(object):
         self.segment_images = dict()
         self.path_to_dir = ""
         self.is_segmented = False
+        self.cell_img_width = 0
+        self.cell_img_height = 0
         
         
         if not MainWindow.objectName():
@@ -219,13 +221,41 @@ class Ui_MainWindow(object):
         self.is_segmented = False
         self.whole_img.removeBoundaries()
         self.whole_img.setPhoto(QPixmap(self.path_to_dir + item.text()))
+        
+    
+    def cellImageCoords(self, x1, y1, x2, y2):
+        
+        x_center = (x1 + x2) // 2
+        y_center = (y1 + y2) // 2 
+        x_tl = x1
+        y_tl = y1
+        self.cell_img_width = 200
+        self.cell_img_height = 200
+        
+        x_tl = x_center - 100
+        y_tl = y_center - 100
+        
+        if x_tl <= 0:
+            x_tl = 1
+        
+        if y_tl <= 0:
+            y_tl = 1
+            
+        if x_tl>= 1279:
+            x_tl = 1079
+            
+        if y_tl >= 959:
+            y_tl = 759
+                
+        return y_tl, x_tl, self.cell_img_width, self.cell_img_height
     
         
     def changeCell(self, item):
         number = int(''.join(x for x in item.text() if x.isdigit())) - 1
         x1, y1, x2, y2 = self.current_cells[number]
-        self.cell_img.setPhoto(QPixmap(self.path_to_dir + self.current_img).copy(y1, x1, y2-y1, x2-x1))
-        self.whole_img.addBoundaries(y1, x1, y2, x2)
+        x, y, width, height = self.cellImageCoords(x1, y1, x2, y2)
+        self.cell_img.setPhoto(QPixmap(self.path_to_dir + self.current_img).copy(x, y, width, height))
+        self.whole_img.addBoundaries(x, y, width, height)
         
     
     def getCells(self, images):
@@ -244,13 +274,7 @@ class Ui_MainWindow(object):
             self.current_cells = self.cells[item.text()]
             cell_names = ["Cell " + str(i) for i in range(1, len(self.current_cells) + 1)]
             self.cell_list.addItems(cell_names)
-        
-    
-    def setWatershedAlgo(self, item):
-        if item:
-            self.algorithm = self.algorithms['watershed']
-            self.getCells(self.images)
-    
+               
             
     def changeMode(self, item):
         if not item:
@@ -259,7 +283,13 @@ class Ui_MainWindow(object):
             self.whole_img.setPhoto(self.segment_images[self.current_img])
         else:
             self.whole_img.setPhoto(QPixmap(self.path_to_dir + self.current_img))
-            
+    
+    
+    def setWatershedAlgo(self, item):
+        if item:
+            self.algorithm = self.algorithms['watershed']
+            self.getCells(self.images)
+       
     
     def getFullInfo(self, item):
         self.full_info.setText(u"You have chosen " + item.text())
@@ -269,3 +299,4 @@ class Ui_MainWindow(object):
         
     def getComment(self, item):
         self.edit_comm.setText(u"Edit comment to " + item.text())
+    

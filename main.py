@@ -1,5 +1,5 @@
-from ui_interface import Ui_MainWindow
-from PySide6.QtWidgets import QApplication, QMainWindow
+from ui_interface import Ui_MainWindow, QCsMainWindow
+from PySide6.QtWidgets import QApplication
 
 import sys
 
@@ -7,10 +7,7 @@ import sys
 if __name__ == "__main__":
     
     app = QApplication(sys.argv)
-    MainWindow = QMainWindow()
-    ui = Ui_MainWindow()
-    
-    ui.setupUi(MainWindow)
-    MainWindow.show()
+    MainWindow = QCsMainWindow()
+    ui = Ui_MainWindow(MainWindow)
     
     sys.exit(app.exec())

@@ -1,32 +1,59 @@
 import os
+import json
 
-from PySide6.QtCore import QCoreApplication, QMetaObject, QRect
+from PySide6.QtCore import QCoreApplication, QMetaObject, QRect, Qt
 from PySide6.QtGui import QPixmap, QAction, QImage
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMenu,
-    QMenuBar, QSizePolicy, QStatusBar, QVBoxLayout, QWidget, QFileDialog)
+from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMenu, QMenuBar, 
+    QSizePolicy, QStatusBar, QVBoxLayout, QWidget, QFileDialog,
+    QTextEdit)
 
 from image_viewer import ImageViewer
+from list_widget import ListWidget
 from watershed import watershedAlgo, dummyAlgo
+from dataset_creator import DatasetCreator
+from main_window import QCsMainWindow
+from hash import pHash
 
 
-class Ui_MainWindow(object):
+class Ui_MainWindow(QCsMainWindow):
     
-    def setupUi(self, MainWindow):
+    def __init__ (self, MainWidnow):
+        
+        super(Ui_MainWindow, self).__init__()
+        MainWidnow.exit_function = self.DSC_saveDataset
         
         self.cells = dict()
         self.current_cells = []
+        
         self.current_img = ""
+        
         self.algorithm = dummyAlgo
         self.algorithms = dict()
+        
         self.images = []
         self.segment_images = dict()
+        
         self.path_to_dir = ""
+        self.extentions = ('.jpg', '.jpeg', '.png', '.bmp', '.eps')
+        
         self.is_segmented = False
-        self.cell_img_width = 0
-        self.cell_img_height = 0
+        
+        self.classes = ['Class 0', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 
+                        'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9']
+        self.path_to_classes = 'data/'
+        
+        self.cell_img_width = 200
+        self.cell_img_height = 200
         self.image_width = 1280
         self.image_height = 960
         
+        self.data = dict()
+        
+        self.setupUi(MainWidnow)
+        MainWidnow.show()
+    
+    
+    def setupUi(self, MainWindow):
         
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
@@ -46,7 +73,10 @@ class Ui_MainWindow(object):
         self.menuHelp.setObjectName(u"menu_help")
         
         self.menuAlgo = QMenu(self.menubar)
-        self.menuHelp.setObjectName(u"menu_algo")
+        self.menuAlgo.setObjectName(u"menu_algo")
+        
+        self.menuMode = QMenu(self.menubar)
+        self.menuMode.setObjectName(u"menu_mode")
         
         MainWindow.setMenuBar(self.menubar)
         
@@ -59,6 +89,7 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
         self.menubar.addAction(self.menuAlgo.menuAction())
+        self.menubar.addAction(self.menuMode.menuAction())
         
         self.load_images = QAction(MainWindow)
         self.load_images.setObjectName(u"load_images")
@@ -68,7 +99,7 @@ class Ui_MainWindow(object):
         
         self.segmentation = QAction(MainWindow)
         self.segmentation.setObjectName(u"segmentation")
-        self.segmentation.triggered.connect(self.changeMode)
+        self.segmentation.triggered.connect(self.changeSegmentMode)
         self.segmentation.setCheckable(False)
         self.menuEdit.addAction(self.segmentation)
         
@@ -78,6 +109,12 @@ class Ui_MainWindow(object):
         self.watershed_option.triggered.connect(self.setWatershedAlgo)
         self.watershed_option.setCheckable(True)
         self.menuAlgo.addAction(self.watershed_option)
+        
+        self.dataset_mode = QAction(MainWindow)
+        self.dataset_mode.setObjectName(u"dataset_mode")
+        self.dataset_mode.triggered.connect(self.changeMode)
+        self.dataset_mode.setCheckable(True)
+        self.menuMode.addAction(self.dataset_mode)
         
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -98,7 +135,7 @@ class Ui_MainWindow(object):
         self.verticalLayout = QVBoxLayout()
         self.verticalLayout.setObjectName(u"verticalLayout")
         
-        self.img_list = QListWidget(self.centralwidget)
+        self.img_list = ListWidget(self.centralwidget)
         self.img_list.setObjectName(u"img_list")
         
         sizePolicy1 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -110,16 +147,24 @@ class Ui_MainWindow(object):
         
         self.verticalLayout.addWidget(self.img_list)
 
-        self.cell_list = QListWidget(self.centralwidget)
+        self.cell_list = ListWidget(self.centralwidget)
         self.cell_list.setObjectName(u"cell_list")
         
         self.img_list.itemClicked.connect(self.getCellList)
         self.img_list.itemClicked.connect(self.changeImage)
         self.img_list.itemClicked.connect(self.getFullInfo)
         
+        self.img_list.keyPressed.connect(self.getCellListFromKey)
+        self.img_list.keyPressed.connect(self.changeImageFromKey)
+        self.img_list.keyPressed.connect(self.getFullInfoFromKey)
+        
         self.cell_list.itemClicked.connect(self.changeCell)
         self.cell_list.itemClicked.connect(self.getProba)
         self.cell_list.itemClicked.connect(self.getComment)
+        
+        self.cell_list.keyPressed.connect(self.changeCellFromKey)
+        self.cell_list.keyPressed.connect(self.getProbaFromKey)
+        self.cell_list.keyPressed.connect(self.getCommentFromKey)
         
         sizePolicy1.setHeightForWidth(self.cell_list.sizePolicy().hasHeightForWidth())
         
@@ -163,7 +208,7 @@ class Ui_MainWindow(object):
         self.proba_comm.setObjectName(u"proba_comm")
         sizePolicy.setHeightForWidth(self.proba_comm.sizePolicy().hasHeightForWidth())
         self.proba_comm.setSizePolicy(sizePolicy)
-
+        
         self.verticalLayout_3.addWidget(self.proba_comm)
 
         self.edit_comm = QLabel(self.centralwidget)
@@ -194,44 +239,70 @@ class Ui_MainWindow(object):
     
     def retranslateUi(self, MainWindow):
         
-        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Test", None))
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Application", None))
         
         self.full_info.setText(QCoreApplication.translate("MainWindow", u"FULL INFO", None))
         self.proba_comm.setText(QCoreApplication.translate("MainWindow", u"PROBABILITY", None))
-        self.edit_comm.setText(QCoreApplication.translate("MainWindow", u"EDIT COMMENT", None))
+        self.edit_comm.setText(QCoreApplication.translate("MainWindow", u"COMMENT FOR DATASET MODE", None))
         
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.menuEdit.setTitle(QCoreApplication.translate("MainWindow", u"Edit", None))
         self.menuHelp.setTitle(QCoreApplication.translate("MainWindow", u"Help", None))
-        self.menuAlgo.setTitle(QCoreApplication.translate("MainWindow", u"Algo", None))
+        self.menuAlgo.setTitle(QCoreApplication.translate("MainWindow", u"Algorithms", None))
+        self.menuMode.setTitle(QCoreApplication.translate("MainWindow", u"Mode", None))
         
         self.watershed_option.setText(QCoreApplication.translate("MainWindow", u"watershed", None))
         self.load_images.setText(QCoreApplication.translate("MainWindow", u"Load Images", None))
         self.segmentation.setText(QCoreApplication.translate("MainWindow", u"Segmentation", None))
+        self.dataset_mode.setText(QCoreApplication.translate("MainWindow", u"Dataset Mode", None))
     
     
     def getImages(self, item):
+        
         if not item:
             self.path_to_dir = QFileDialog.getExistingDirectory(None, 'Select a folder:', 'C:\\', QFileDialog.ShowDirsOnly)  + '/'
-            self.images = os.listdir(self.path_to_dir)
+            files = os.listdir(self.path_to_dir)
+        
+            for img in files:
+                if img.endswith(self.extentions):
+                    self.images.append(img)
+                    
             self.img_list.clear()
             self.img_list.addItems(self.images)
+            
+            
+    def keyCheck(self, event):
+        return event.key() == Qt.Key_Return
+    
+    
+###############################################################################
     
         
     def changeImage(self, item):
+        
         self.current_img = item.text()
         self.is_segmented = False
         self.whole_img.removeBoundaries()
         self.whole_img.setPhoto(QPixmap(self.path_to_dir + item.text()))
         
+        if item.text() in self.segment_images:
+            _, image_size, _ = self.segment_images[item.text()]
+            self.image_height = image_size.height()
+            self.image_width = image_size.width()
+            
+    
+    def changeImageFromKey(self, event):
+        if self.keyCheck(event):
+            self.changeImage(self.img_list.currentItem())
+            
+            
+###############################################################################
+        
     
     def cellImageCoords(self, x1, y1, x2, y2):
-        
-        self.cell_img_width = 200
-        self.cell_img_height = 200
-        
-        x_tl = (x1 + x2) // 2 - 100
-        y_tl = (y1 + y2) // 2  - 100
+       
+        x_tl = (x1 + x2 - self.cell_img_width) // 2
+        y_tl = (y1 + y2  - self.cell_img_height) // 2
         
         if x_tl <= 0:
             x_tl = 0
@@ -247,6 +318,9 @@ class Ui_MainWindow(object):
                 
         return y_tl, x_tl, self.cell_img_width, self.cell_img_height
     
+    
+###############################################################################
+    
         
     def changeCell(self, item):
         number = int(''.join(x for x in item.text() if x.isdigit())) - 1
@@ -255,30 +329,54 @@ class Ui_MainWindow(object):
         self.cell_img.setPhoto(QPixmap(self.path_to_dir + self.current_img).copy(x, y, width, height))
         self.whole_img.addBoundaries(x, y, width, height)
         
+        
+    def changeCellFromKey(self, event):
+        if self.keyCheck(event):
+            self.changeCell(self.cell_list.currentItem())
+            
+            
+###############################################################################
+
     
     def getCells(self, images):
         for i in range(len(images)):
             image_path = self.path_to_dir + images[i]
             self.cells[images[i]], image = self.algorithm(image_path)
+            image_hash = pHash(image)
+            
             image = QImage(image, image.shape[1],\
-                            image.shape[0], image.shape[1] * 3,QImage.Format_BGR888)
-            self.segment_images[images[i]] = QPixmap(image)
+                            image.shape[0], image.shape[1] * 3, QImage.Format_BGR888)
+            self.segment_images[images[i]] = QPixmap(image), image.size(), image_hash
         self.cell_list.clear()
+     
+     
+###############################################################################
         
     
     def getCellList(self, item):
         self.cell_list.clear()
+        
         if item.text() in self.cells.keys():
             self.current_cells = self.cells[item.text()]
             cell_names = ["Cell " + str(i) for i in range(1, len(self.current_cells) + 1)]
             self.cell_list.addItems(cell_names)
-               
+    
             
-    def changeMode(self, item):
+    def getCellListFromKey(self, event):
+        if self.keyCheck(event):
+            self.getCellList(self.img_list.currentItem())
+            
+
+###############################################################################
+
+            
+    def changeSegmentMode(self, item):
         if not item:
             self.is_segmented = not self.is_segmented
+        
         if self.is_segmented:
-            self.whole_img.setPhoto(self.segment_images[self.current_img])
+            self.whole_img.setPhoto(self.segment_images[self.current_img][0])
+            
         else:
             self.whole_img.setPhoto(QPixmap(self.path_to_dir + self.current_img))
     
@@ -287,16 +385,105 @@ class Ui_MainWindow(object):
         if item:
             self.algorithm = self.algorithms['watershed']
             self.getCells(self.images)
-       
+            
+            
+    def DSC_openDataset(self):
+        with open('dataset.json', 'r+') as file:
+            self.data = json.load(file)
+        for cell_class in self.classes:
+            path = self.path_to_classes + cell_class
+            isExist = os.path.exists(path)
+            if not isExist:
+                os.makedirs(path)
+                
+            
+    def DSC_saveDataset(self):
+        with open('dataset.json', 'w+') as file:
+            json.dump(self.data, file)
     
+
+###############################################################################
+    
+    
+    def DSC_addItem(self, item):
+        key = self.img_list.currentItem().text() + '/' + \
+              self.cell_list.currentItem().text()
+        value = self.path_to_classes + item.text()
+        self.data.update({key: value})
+        self.proba_comm.setText(self.data[key])
+        self.edit_comm.setText()
+        
+        
+    
+    def DSC_addItemFromKey(self, event):
+        if self.keyCheck(event):
+            self.DSC_addItem(self.proba_write.currentItem())
+            
+            
+###############################################################################
+
+
+    def DSC_removeItem(self, index):
+        pass
+        
+        
+    def changeMode(self, item):
+        if item:
+            self.DSC_openDataset()
+            self.proba_write = ListWidget(self.centralwidget)
+            self.proba_write.setObjectName(u"class_list")
+            self.proba_write.addItems(self.classes)
+            self.proba_write.itemClicked.connect(self.DSC_addItem)
+            self.proba_write.itemClicked.connect(self.getComment)
+            self.proba_write.keyPressed.connect(self.DSC_addItemFromKey)
+            self.proba_write.keyPressed.connect(self.getCommentFromKey)
+            self.verticalLayout_3.replaceWidget(self.proba_comm, self.proba_write)
+        
+        else:
+            if len(self.data) != 0:
+                self.DSC_saveDataset()
+            self.verticalLayout_3.replaceWidget(self.proba_write, self.proba_comm)
+            self.proba_write.deleteLater()
+            
+    
+###############################################################################
+
+
     def getFullInfo(self, item):
         self.full_info.setText(u"You have chosen " + item.text())
         
-    
+        
+    def getFullInfoFromKey(self, event):
+        if self.keyCheck(event):
+            self.getFullInfo(self.img_list.currentItem())
+            
+            
+###############################################################################        
+        
+
     def getProba(self, item):
-        self.proba_comm.setText(u"Probability of " + item.text())
+        key = self.img_list.currentItem().text() + '/' + item.text()
+        if key not in self.data:
+            self.proba_comm.setText(u"Probability of " + item.text())
+        else:
+            self.proba_comm.setText(self.data[key])
+        
+        
+    def getProbaFromKey(self, event):
+        if self.keyCheck(event):
+            self.getProba(self.cell_list.currentItem())
+        
+        
+###############################################################################
         
         
     def getComment(self, item):
         self.edit_comm.setText(u"Edit comment to " + item.text())
-    
+        
+        
+    def getCommentFromKey(self, event):
+        if self.keyCheck(event):
+            self.getComment(self.cell_list.currentItem())
+            
+            
+###############################################################################

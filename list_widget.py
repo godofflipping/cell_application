@@ -1,5 +1,6 @@
 from PySide6 import QtCore, QtWidgets
 
+# QListWidget с возможностью взаимодействовать через клавиатуру
 class ListWidget(QtWidgets.QListWidget, QtWidgets.QWidget):
     keyPressed = QtCore.Signal(QtCore.QEvent)
     

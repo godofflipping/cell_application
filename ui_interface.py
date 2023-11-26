@@ -1,7 +1,8 @@
 import os
 import json
 
-from PySide6.QtCore import QCoreApplication, QMetaObject, QRect, Qt
+from PySide6.QtCore import (QCoreApplication, QMetaObject, QRect, Qt,
+    QIODevice, QFile)
 from PySide6.QtGui import QPixmap, QAction, QImage
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMenu, QMenuBar, 
     QSizePolicy, QStatusBar, QVBoxLayout, QWidget, QFileDialog,
@@ -14,7 +15,6 @@ from dataset_creator import DatasetCreator
 from main_window import QCsMainWindow
 from hash import pHash
 
-
 class Ui_MainWindow(QCsMainWindow):
     
     def __init__ (self, MainWidnow):
@@ -26,6 +26,7 @@ class Ui_MainWindow(QCsMainWindow):
         self.current_cells = []
         
         self.current_img = ""
+        self.current_cell = QPixmap()
         
         self.algorithm = dummyAlgo
         self.algorithms = dict()
@@ -48,11 +49,13 @@ class Ui_MainWindow(QCsMainWindow):
         self.image_height = 960
         
         self.data = dict()
+        self.data_images = dict()
         
         self.setupUi(MainWidnow)
         MainWidnow.show()
     
     
+    # Создание интерфеса
     def setupUi(self, MainWindow):
         
         if not MainWindow.objectName():
@@ -236,7 +239,7 @@ class Ui_MainWindow(QCsMainWindow):
 
         QMetaObject.connectSlotsByName(MainWindow)
 
-    
+
     def retranslateUi(self, MainWindow):
         
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Application", None))
@@ -257,8 +260,8 @@ class Ui_MainWindow(QCsMainWindow):
         self.dataset_mode.setText(QCoreApplication.translate("MainWindow", u"Dataset Mode", None))
     
     
-    def getImages(self, item):
-        
+    # Получение папки с изображениями (File -> Load Images)
+    def getImages(self, item): 
         if not item:
             self.path_to_dir = QFileDialog.getExistingDirectory(None, 'Select a folder:', 'C:\\', QFileDialog.ShowDirsOnly)  + '/'
             files = os.listdir(self.path_to_dir)
@@ -270,16 +273,16 @@ class Ui_MainWindow(QCsMainWindow):
             self.img_list.clear()
             self.img_list.addItems(self.images)
             
-            
+    
+    # Проверка нажатия определённой кнопки на клавиатуре
     def keyCheck(self, event):
         return event.key() == Qt.Key_Return
     
     
 ###############################################################################
     
-        
+    # Смена основного изображения
     def changeImage(self, item):
-        
         self.current_img = item.text()
         self.is_segmented = False
         self.whole_img.removeBoundaries()
@@ -290,7 +293,7 @@ class Ui_MainWindow(QCsMainWindow):
             self.image_height = image_size.height()
             self.image_width = image_size.width()
             
-    
+    # Смена основного изображения через клавиатуру
     def changeImageFromKey(self, event):
         if self.keyCheck(event):
             self.changeImage(self.img_list.currentItem())
@@ -299,8 +302,9 @@ class Ui_MainWindow(QCsMainWindow):
 ###############################################################################
         
     
+    # Нахождение центра клетки (после получения bounding box)
+    # и левых верхних координат изображения клетки
     def cellImageCoords(self, x1, y1, x2, y2):
-       
         x_tl = (x1 + x2 - self.cell_img_width) // 2
         y_tl = (y1 + y2  - self.cell_img_height) // 2
         
@@ -321,15 +325,18 @@ class Ui_MainWindow(QCsMainWindow):
     
 ###############################################################################
     
-        
+    
+    # Смена изображения клетки
     def changeCell(self, item):
         number = int(''.join(x for x in item.text() if x.isdigit())) - 1
         x1, y1, x2, y2 = self.current_cells[number]
         x, y, width, height = self.cellImageCoords(x1, y1, x2, y2)
-        self.cell_img.setPhoto(QPixmap(self.path_to_dir + self.current_img).copy(x, y, width, height))
+        self.current_cell = QPixmap(self.path_to_dir + self.current_img).copy(x, y, width, height)
+        self.cell_img.setPhoto(self.current_cell)
         self.whole_img.addBoundaries(x, y, width, height)
         
-        
+    
+    # Смена изображения клетки через клавиатуру  
     def changeCellFromKey(self, event):
         if self.keyCheck(event):
             self.changeCell(self.cell_list.currentItem())
@@ -338,6 +345,7 @@ class Ui_MainWindow(QCsMainWindow):
 ###############################################################################
 
     
+    # Получение отсегментированного изображения и bounding box клеток
     def getCells(self, images):
         for i in range(len(images)):
             image_path = self.path_to_dir + images[i]
@@ -353,6 +361,7 @@ class Ui_MainWindow(QCsMainWindow):
 ###############################################################################
         
     
+    # Получение списка всех клеток
     def getCellList(self, item):
         self.cell_list.clear()
         
@@ -361,7 +370,8 @@ class Ui_MainWindow(QCsMainWindow):
             cell_names = ["Cell " + str(i) for i in range(1, len(self.current_cells) + 1)]
             self.cell_list.addItems(cell_names)
     
-            
+    
+    # Получение списка всех клеток через клавиатуру
     def getCellListFromKey(self, event):
         if self.keyCheck(event):
             self.getCellList(self.img_list.currentItem())
@@ -369,7 +379,8 @@ class Ui_MainWindow(QCsMainWindow):
 
 ###############################################################################
 
-            
+       
+    # Отображение сегментированного изображения     
     def changeSegmentMode(self, item):
         if not item:
             self.is_segmented = not self.is_segmented
@@ -381,40 +392,64 @@ class Ui_MainWindow(QCsMainWindow):
             self.whole_img.setPhoto(QPixmap(self.path_to_dir + self.current_img))
     
     
+    # Выбор watershed алгоритма сегментации
     def setWatershedAlgo(self, item):
         if item:
             self.algorithm = self.algorithms['watershed']
             self.getCells(self.images)
             
-            
+
+    # Получение всех элементов датасета
     def DSC_openDataset(self):
+        if not os.path.exists('dataset.json'):
+            file = open('dataset.json', 'w')
+            file.write('{}')
+            
+        if not os.path.exists("data"):
+            os.mkdir('data')
+        
         with open('dataset.json', 'r+') as file:
             self.data = json.load(file)
+            self.data_images.clear()
+        
         for cell_class in self.classes:
             path = self.path_to_classes + cell_class
             isExist = os.path.exists(path)
             if not isExist:
                 os.makedirs(path)
                 
-            
+    
+    # Сохранение всех элементов датасета в json и в папки классов   
     def DSC_saveDataset(self):
         with open('dataset.json', 'w+') as file:
             json.dump(self.data, file)
+        
+        for key in self.data_images.keys():
+            file = QFile(key[1] + '/' + key[0] + ".png")
+            file.open(QIODevice.WriteOnly)
+            self.data_images[key].save(file, "PNG")
     
 
 ###############################################################################
     
     
+    # Добавление элемента в датасет
     def DSC_addItem(self, item):
-        key = self.img_list.currentItem().text() + '/' + \
-              self.cell_list.currentItem().text()
-        value = self.path_to_classes + item.text()
-        self.data.update({key: value})
-        self.proba_comm.setText(self.data[key])
-        self.edit_comm.setText()
+        key = str(self.segment_images[self.current_img][2]) + '_' + \
+              self.cell_list.currentItem().text()[5:]
         
+        if key in self.data:
+            prev_value = self.data[key]
+            filename = prev_value + '/' + key + '.png'
+            if os.path.exists(filename):
+                os.remove(filename)
         
+        self.data.update({key: self.path_to_classes + item.text()})        
+        self.data_images[(key, self.data[key])] = self.current_cell
+        self.getProba(self.cell_list.currentItem())
+            
     
+    # Добавление элемента в датасет через клавиатуру
     def DSC_addItemFromKey(self, event):
         if self.keyCheck(event):
             self.DSC_addItem(self.proba_write.currentItem())
@@ -423,10 +458,12 @@ class Ui_MainWindow(QCsMainWindow):
 ###############################################################################
 
 
+    # Удаление элемента из датасета
     def DSC_removeItem(self, index):
         pass
         
-        
+    
+    # Возможность формировать датасет    
     def changeMode(self, item):
         if item:
             self.DSC_openDataset()
@@ -449,10 +486,12 @@ class Ui_MainWindow(QCsMainWindow):
 ###############################################################################
 
 
+    # Отображение полной информации об основном изображении
     def getFullInfo(self, item):
         self.full_info.setText(u"You have chosen " + item.text())
         
-        
+    
+    # Отображение полной информации об основном изображении через клавиатуру    
     def getFullInfoFromKey(self, event):
         if self.keyCheck(event):
             self.getFullInfo(self.img_list.currentItem())
@@ -461,14 +500,18 @@ class Ui_MainWindow(QCsMainWindow):
 ###############################################################################        
         
 
+    # Оторажение верояности или класса (при формировании датасета)
     def getProba(self, item):
-        key = self.img_list.currentItem().text() + '/' + item.text()
+        key = str(self.segment_images[self.current_img][2]) + '_' + \
+              item.text()[5:]
         if key not in self.data:
             self.proba_comm.setText(u"Probability of " + item.text())
         else:
-            self.proba_comm.setText(self.data[key])
+            cell_class = self.data[key]
+            self.proba_comm.setText(cell_class[5:])
         
-        
+    
+    # Оторажение верояности или класса (при формировании датасета) через клавиатуру    
     def getProbaFromKey(self, event):
         if self.keyCheck(event):
             self.getProba(self.cell_list.currentItem())
@@ -476,11 +519,13 @@ class Ui_MainWindow(QCsMainWindow):
         
 ###############################################################################
         
-        
+    
+    # Оторажение комментария после смены изображения клетки    
     def getComment(self, item):
         self.edit_comm.setText(u"Edit comment to " + item.text())
+     
         
-        
+    # Оторажение комментария после смены изображения клетки через клавиатуру
     def getCommentFromKey(self, event):
         if self.keyCheck(event):
             self.getComment(self.cell_list.currentItem())

@@ -4,12 +4,11 @@ from PySide6.QtWidgets import (QGraphicsView, QGraphicsScene, QGraphicsPixmapIte
     QFrame, QGraphicsRectItem)
 
 
+# Отображение изображения с возможностью масштабирования
 class ImageViewer(QGraphicsView):
-    
     photoClicked = Signal(QPointF)
 
     def __init__(self, parent):
-        
         super(ImageViewer, self).__init__(parent)
         
         self.zoom = 0
@@ -43,7 +42,6 @@ class ImageViewer(QGraphicsView):
 
 
     def fitInView(self, scale=True):
-        
         rect = QRectF(self.photo.pixmap().rect())
         
         if not rect.isNull():
@@ -66,7 +64,6 @@ class ImageViewer(QGraphicsView):
 
 
     def setPhoto(self, pixmap=None):
-        
         self.zoom = 0
         
         if pixmap and not pixmap.isNull():
@@ -83,7 +80,6 @@ class ImageViewer(QGraphicsView):
 
 
     def wheelEvent(self, event):
-        
         if self.hasPhoto():
             
             if event.angleDelta().y() > 0:
@@ -105,7 +101,6 @@ class ImageViewer(QGraphicsView):
 
 
     def toggleDragMode(self):
-        
         if self.dragMode() == QGraphicsView.DragMode.ScrollHandDrag:
             self.setDragMode(QGraphicsView.DragMode.NoDrag)
         
@@ -114,7 +109,6 @@ class ImageViewer(QGraphicsView):
 
 
     def mousePressEvent(self, event):
-        
         if self.photo.isUnderMouse():
             self.photoClicked.emit(self.mapToScene(event.position().toPoint()))
         

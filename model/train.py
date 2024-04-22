@@ -1,6 +1,8 @@
 import os
+import copy
 import json
 import torch
+import random
 import numpy as np
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, ConfusionMatrixDisplay
@@ -12,7 +14,8 @@ class TrainNeuralNetwork():
                  optimizer, device, 
                  train_loader, test_loader,
                  class_count, confusion_matrixes,
-                 reverse_dict, categories
+                 reverse_dict, categories,
+                 random_state, scheduler=None
                  ):
         self.model = model
         self.criterion = criterion
@@ -24,6 +27,11 @@ class TrainNeuralNetwork():
         self.confusion_matrixes = confusion_matrixes
         self.reverse_dict = reverse_dict
         self.categories = categories
+        self.scheduler = scheduler
+        torch.manual_seed(random_state)
+        torch.cuda.manual_seed(random_state)
+        random.seed(random_state)
+        np.random.seed(random_state)
 
     def train(self, num_epochs, validation_history, training_history):
         for epoch in range(1, num_epochs + 1):
@@ -60,6 +68,9 @@ class TrainNeuralNetwork():
             validation_history['accuracy'].append(validation_accuracy)
             training_history['loss'].append(epoch_loss)
             training_history['accuracy'].append(epoch_accuracy)
+            
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             print()
             print("Epoch {}/{}:".format(epoch, num_epochs))
@@ -110,7 +121,7 @@ class TrainNeuralNetwork():
     
 
     def run(self, link, num_epochs, validation_history, training_history, conf_matrix_history, save_weights):
-        weights_effnet_path = link + 'weights_effnet.pth'
+        weights_effnet_path = link + 'weights.pth'
         if save_weights:
             if os.path.isfile(weights_effnet_path):
                 self.model.load_state_dict(torch.load(weights_effnet_path, map_location=torch.device(self.device)))
@@ -125,15 +136,15 @@ class TrainNeuralNetwork():
             
         conf_matrix_history['list'] = [conf_matrix.tolist() for conf_matrix in self.confusion_matrixes]
 
-        FILE_PATH_TRAIN = link + 'effnet_train_acc.json'
+        FILE_PATH_TRAIN = link + 'train_acc.json'
         with open(FILE_PATH_TRAIN, 'w') as file_train:
             json.dump(training_history, file_train)
 
-        FILE_PATH_VALID = link + 'effnet_valid_acc.json'
+        FILE_PATH_VALID = link + 'valid_acc.json'
         with open(FILE_PATH_VALID, 'w') as file_valid:
             json.dump(validation_history, file_valid)
 
-        FILE_PATH_MATRIX = link + 'effnet_conf_matrix.json'
+        FILE_PATH_MATRIX = link + 'conf_matrix.json'
         with open(FILE_PATH_MATRIX, 'w') as file_matrix:
             json.dump(conf_matrix_history, file_matrix)
 

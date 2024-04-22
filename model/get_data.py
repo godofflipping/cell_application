@@ -1,5 +1,6 @@
 import random
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.utils import resample
@@ -8,6 +9,8 @@ from sklearn.model_selection import train_test_split
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+import cv2
+
 import albumentations as album
 from albumentations.pytorch import ToTensorV2
 
@@ -15,7 +18,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-def get_data():
+def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_SIZE=20):
     IS_COLAB = False
     if IS_COLAB:
         dataset_dir = '/content/drive/MyDrive/Degree/bone_marrow_cell_dataset/'
@@ -31,9 +34,11 @@ def get_data():
     reverse_dict = {key: value for key, value in enumerate(categories)}
 
     print(df.shape)
-    RANDOM_STATE = 42
     random.seed(RANDOM_STATE)
-
+    np.random.seed(RANDOM_STATE)
+    torch.manual_seed(RANDOM_STATE)
+    torch.cuda.manual_seed(RANDOM_STATE)
+    
     strat = df['labels']
     train_df, test_df = train_test_split(df,
         train_size = 0.75,
@@ -45,9 +50,8 @@ def get_data():
     train_df_group = train_df.groupby('labels').count()
     test_df_group = test_df.groupby('labels').count()
 
-    NUM_PICS = 15000
-    TRAIN_SAMPLE_SIZE = 1500
-    TEST_SAMPLE_SIZE = 500
+    TRAIN_SAMPLE_SIZE = 18000
+    TEST_SAMPLE_SIZE = 6000
 
     for label in train_df_group.index.to_list():
         if train_df_group.loc[label, 'filepaths'] < TRAIN_SAMPLE_SIZE:
@@ -77,12 +81,12 @@ def get_data():
     print(train_df.shape)
     print(test_df.shape)
 
-    train_df = train_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TRAIN_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
-    train_df = train_df.drop(['level_0', 'level_1'], axis=1)
+    #train_df = train_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TRAIN_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
+    #train_df = train_df.drop(['level_0', 'level_1'], axis=1)
     train_df = train_df.sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
 
-    test_df = test_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TEST_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
-    test_df = test_df.drop(['level_0', 'level_1'], axis=1)
+    #test_df = test_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TEST_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
+    #test_df = test_df.drop(['level_0', 'level_1'], axis=1)
     test_df = test_df.sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
 
     print(train_df.shape)
@@ -110,27 +114,47 @@ def get_data():
             image = self.transform(image=image)['image']
             return image, label
         
-    BATCH_SIZE = 20
     image_side = 250
     
-    torch.manual_seed(RANDOM_STATE)
-    torch.cuda.manual_seed(RANDOM_STATE)
-
-    train_transform = album.Compose([
-        #transforms.ToPILImage(),
-        album.HorizontalFlip(),
-        album.VerticalFlip(),
-        album.SmallestMaxSize(max_size=256),
-        album.RandomCrop(height=image_side, width=image_side),
+    augmentations = album.OneOf([
+        album.HorizontalFlip(p=0.5),
+        album.VerticalFlip(p=0.15),
+        album.Rotate(limit=75, border_mode=cv2.BORDER_REPLICATE, p=0.9),
+        album.RandomCrop(height=image_side, width=image_side, p=0.2),
         album.OneOf([
-            album.Blur(),
+            album.OneOf([
+                album.MotionBlur(),
+                album.MedianBlur(),
+                album.Blur(),
+                album.GaussianBlur()
+            ]),
+            album.RandomGamma(),
             album.GaussNoise(),
             album.RandomBrightnessContrast(),
-            album.RGBShift(),
-        ], p=1),
+            album.ChannelShuffle(),
+            album.RGBShift(
+              r_shift_limit=25,
+              g_shift_limit=25,
+              b_shift_limit=25
+            ),
+        ], p=0.9),
+        album.ShiftScaleRotate(shift_limit=0.075, border_mode=cv2.BORDER_REPLICATE, p=0.2)
+    ])
+    
+    train_transform = album.Compose([
+        augmentations,
         album.Resize(image_side, image_side),
+        album.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)), # new
         ToTensorV2()
     ])
+    
+    test_transform = album.Compose([
+        augmentations,
+        album.Resize(image_side, image_side),
+        album.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)), # new
+        ToTensorV2()
+    ])
+    
     train_data = ImageData(
         df = train_df,
         transform = train_transform,
@@ -141,16 +165,7 @@ def get_data():
         batch_size = BATCH_SIZE,
         shuffle = True
     )
-
-    test_transform = album.Compose([
-        #transforms.ToPILImage(),
-        album.HorizontalFlip(),
-        album.VerticalFlip(),
-        album.SmallestMaxSize(max_size=256),
-        album.CenterCrop(image_side, image_side),
-        album.Resize(image_side, image_side),
-        ToTensorV2()
-    ])
+    
     test_data = ImageData(
         df = test_df,
         transform = test_transform,

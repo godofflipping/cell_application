@@ -1,17 +1,16 @@
 import os
-import copy
 import json
 import torch
 import random
 import numpy as np
 from tqdm import tqdm
-from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, ConfusionMatrixDisplay
+from sklearn.metrics import accuracy_score, confusion_matrix
 
 
 class TrainNeuralNetwork():
-    def __init__(self, 
-                 model, criterion, 
-                 optimizer, device, 
+    def __init__(self,
+                 model, criterion,
+                 optimizer, device,
                  train_loader, test_loader,
                  class_count, confusion_matrixes,
                  reverse_dict, categories,
@@ -58,7 +57,6 @@ class TrainNeuralNetwork():
                                     y_pred=predictions.cpu().numpy()
                                 )
 
-
             epoch_loss = running_loss / len(self.train_loader)
             epoch_accuracy /= len(self.train_loader)
 
@@ -68,7 +66,7 @@ class TrainNeuralNetwork():
             validation_history['accuracy'].append(validation_accuracy)
             training_history['loss'].append(epoch_loss)
             training_history['accuracy'].append(epoch_accuracy)
-            
+
             if self.scheduler is not None:
                 self.scheduler.step()
 
@@ -82,7 +80,6 @@ class TrainNeuralNetwork():
             ))
             print()
 
-            
     def evaluate(self):
         validation_loss = 0.0
         validation_accuracy = 0
@@ -118,7 +115,6 @@ class TrainNeuralNetwork():
         self.confusion_matrixes.append(matrix)
 
         return validation_accuracy, validation_loss
-    
 
     def run(self, link, num_epochs, validation_history, training_history, conf_matrix_history, save_weights):
         weights_effnet_path = link + 'weights.pth'
@@ -133,7 +129,7 @@ class TrainNeuralNetwork():
             torch.save(self.model.state_dict(), weights_effnet_path)
         else:
             self.model.load_state_dict(torch.load(weights_effnet_path, map_location=torch.device(self.device)))
-            
+
         conf_matrix_history['list'] = [conf_matrix.tolist() for conf_matrix in self.confusion_matrixes]
 
         FILE_PATH_TRAIN = link + 'train_acc.json'

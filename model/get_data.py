@@ -38,7 +38,7 @@ def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_S
     np.random.seed(RANDOM_STATE)
     torch.manual_seed(RANDOM_STATE)
     torch.cuda.manual_seed(RANDOM_STATE)
-    
+
     strat = df['labels']
     train_df, test_df = train_test_split(df,
         train_size = 0.75,
@@ -50,8 +50,8 @@ def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_S
     train_df_group = train_df.groupby('labels').count()
     test_df_group = test_df.groupby('labels').count()
 
-    TRAIN_SAMPLE_SIZE = 18000
-    TEST_SAMPLE_SIZE = 6000
+    TRAIN_SAMPLE_SIZE = 1500
+    TEST_SAMPLE_SIZE = 500
 
     for label in train_df_group.index.to_list():
         if train_df_group.loc[label, 'filepaths'] < TRAIN_SAMPLE_SIZE:
@@ -77,16 +77,16 @@ def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_S
                 random_state = RANDOM_STATE
             )
             test_df = pd.concat([df_major, df_minor_up])
-            
+
     print(train_df.shape)
     print(test_df.shape)
 
-    #train_df = train_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TRAIN_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
-    #train_df = train_df.drop(['level_0', 'level_1'], axis=1)
+    train_df = train_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TRAIN_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
+    train_df = train_df.drop(['level_0', 'level_1'], axis=1)
     train_df = train_df.sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
 
-    #test_df = test_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TEST_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
-    #test_df = test_df.drop(['level_0', 'level_1'], axis=1)
+    test_df = test_df.groupby('labels', as_index=False).apply(lambda x: x.sample(TEST_SAMPLE_SIZE, replace=True, random_state=RANDOM_STATE)).reset_index()
+    test_df = test_df.drop(['level_0', 'level_1'], axis=1)
     test_df = test_df.sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
 
     print(train_df.shape)
@@ -111,11 +111,12 @@ def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_S
             label = self.classes[index]
             img_path = dataset_dir + self.image_paths[index]
             image = plt.imread(img_path)[:,:,:3]
+            #imread ���������� float - ���� png, int - ���� �� ���������
             image = self.transform(image=image)['image']
             return image, label
-        
-    image_side = 250
-    
+
+    image_side = 224
+
     augmentations = album.OneOf([
         album.HorizontalFlip(p=0.5),
         album.VerticalFlip(p=0.15),
@@ -140,21 +141,21 @@ def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_S
         ], p=0.9),
         album.ShiftScaleRotate(shift_limit=0.075, border_mode=cv2.BORDER_REPLICATE, p=0.2)
     ])
-    
+
     train_transform = album.Compose([
         augmentations,
         album.Resize(image_side, image_side),
-        album.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)), # new
+        album.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)), # new
         ToTensorV2()
     ])
-    
+
     test_transform = album.Compose([
         augmentations,
         album.Resize(image_side, image_side),
-        album.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)), # new
+        album.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)), # new
         ToTensorV2()
     ])
-    
+
     train_data = ImageData(
         df = train_df,
         transform = train_transform,
@@ -165,7 +166,7 @@ def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_S
         batch_size = BATCH_SIZE,
         shuffle = True
     )
-    
+
     test_data = ImageData(
         df = test_df,
         transform = test_transform,
@@ -176,5 +177,5 @@ def get_data(RANDOM_STATE, TRAIN_SAMPLE_SIZE=1500, TEST_SAMPLE_SIZE=500, BATCH_S
         batch_size = BATCH_SIZE,
         shuffle = False
     )
-    
+
     return train_loader, test_loader, reverse_dict, categories
